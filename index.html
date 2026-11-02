@@ -46,6 +46,7 @@
             top: 0;
             z-index: 100;
             box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            gap: 16px;
         }
 
         .brand {
@@ -77,6 +78,106 @@
             display: flex;
             align-items: center;
             gap: 12px;
+        }
+
+        /* FPS Control in Top Bar */
+        .fps-control-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: #202020;
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 3px 8px;
+        }
+
+        .fps-control-group label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .fps-control-group select {
+            background: #111;
+            border: 1px solid #444;
+            color: #fff;
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .fps-control-group select:focus {
+            border-color: var(--accent-color);
+        }
+
+        /* Tooltip Info Icon */
+        .info-wrapper {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            cursor: help;
+        }
+
+        .info-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: #333;
+            color: #aaa;
+            font-size: 10px;
+            font-weight: bold;
+            font-family: serif;
+            transition: all 0.15s ease;
+        }
+
+        .info-wrapper:hover .info-icon {
+            background: var(--accent-color);
+            color: #000;
+        }
+
+        .info-wrapper .tooltip-text {
+            visibility: hidden;
+            opacity: 0;
+            width: 220px;
+            background: #111;
+            color: #ddd;
+            text-align: left;
+            border: 1px solid #444;
+            border-radius: 6px;
+            padding: 8px 10px;
+            position: absolute;
+            z-index: 1000;
+            top: 135%;
+            left: 50%;
+            transform: translateX(-50%);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+            font-size: 11px;
+            line-height: 1.4;
+            pointer-events: none;
+            transition: opacity 0.2s ease, visibility 0.2s ease;
+        }
+
+        .info-wrapper .tooltip-text::after {
+            content: "";
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: transparent transparent #444 transparent;
+        }
+
+        .info-wrapper:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
         }
 
         .global-status {
@@ -220,7 +321,6 @@
             box-shadow: 0 4px 12px rgba(0,0,0,0.8);
         }
 
-        /* Fullscreen: fill the display while keeping the aspect ratio */
         canvas:fullscreen {
             width: 100vw;
             height: 100vh;
@@ -388,6 +488,25 @@
             <span class="badge">WebMIDI</span>
         </div>
         <div class="top-controls">
+            <!-- Global Refresh Rate Setting -->
+            <div class="fps-control-group">
+                <label for="select-fps">Rate</label>
+                <select id="select-fps">
+                    <option value="5">5 FPS</option>
+                    <option value="10">10 FPS</option>
+                    <option value="15">15 FPS</option>
+                    <option value="20" selected>20 FPS</option>
+                    <option value="25">25 FPS</option>
+                    <option value="30">30 FPS (Max)</option>
+                </select>
+                <div class="info-wrapper" tabindex="0">
+                    <span class="info-icon">i</span>
+                    <span class="tooltip-text">
+                        The higher the refresh rate, the less MIDI bandwidth remains for time-critical data like MIDI clock, leading to possible sync jitter.
+                    </span>
+                </div>
+            </div>
+
             <span id="global-status" class="global-status">WebMIDI Disconnected</span>
             <button id="btn-about">About</button>
             <button id="btn-connect-midi" class="btn-primary">Connect WebMIDI</button>
@@ -853,7 +972,9 @@
             await this.captureFrame();
 
             const elapsed = performance.now() - start;
-            const delay = Math.max(0, 50 - elapsed);
+            // Interval calculated dynamically from global rate (bounded max 30 fps)
+            const targetInterval = 1000 / this.manager.targetFps;
+            const delay = Math.max(0, targetInterval - elapsed);
             this.streamTimer = setTimeout(() => this.streamLoop(), delay);
         }
 
@@ -913,11 +1034,13 @@
             this.pairedDevices = [];
             this.cards = new Map();
             this.cardIdCounter = 0;
+            this.targetFps = 20; // Default target refresh rate
 
             this.gridContainer = document.getElementById("grid-container");
             this.btnAddTile = document.getElementById("btn-add-tile");
             this.btnConnectMidi = document.getElementById("btn-connect-midi");
             this.lblGlobalStatus = document.getElementById("global-status");
+            this.selectFps = document.getElementById("select-fps");
 
             // About Modal elements
             this.btnAbout = document.getElementById("btn-about");
@@ -927,6 +1050,12 @@
 
             this.btnConnectMidi.addEventListener("click", () => this.initMIDI());
             this.btnAddTile.addEventListener("click", () => this.addCard());
+
+            // FPS Selection listener (clamped to max 30)
+            this.selectFps.addEventListener("change", (e) => {
+                const parsed = parseInt(e.target.value, 10);
+                this.targetFps = Math.min(30, Math.max(1, isNaN(parsed) ? 20 : parsed));
+            });
 
             // Modal events
             this.btnAbout.addEventListener("click", () => this.openAbout());
@@ -976,7 +1105,6 @@
 
         scanDevices() {
             this.pairedDevices = getMatchedPairs(this.midiAccess);
-            // Updated text to "# Midi Device(s) Detected"
             this.lblGlobalStatus.textContent = `${this.pairedDevices.length} Midi Device(s) Detected`;
             this.cards.forEach(card => card.updateDeviceDropdown());
         }
