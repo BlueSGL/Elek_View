@@ -220,6 +220,18 @@
             box-shadow: 0 4px 12px rgba(0,0,0,0.8);
         }
 
+        /* Fullscreen: fill the display while keeping the aspect ratio */
+        canvas:fullscreen {
+            width: 100vw;
+            height: 100vh;
+            max-width: none;
+            aspect-ratio: auto;
+            object-fit: contain;
+            border: none;
+            border-radius: 0;
+            box-shadow: none;
+        }
+
         /* Card Footer Controls */
         .card-footer {
             padding: 10px 14px;
@@ -617,6 +629,7 @@
                         <option value="">Select Paired Device...</option>
                     </select>
                     <button class="btn-start btn-primary" disabled>Start</button>
+                    <button class="btn-icon btn-fullscreen" title="Fullscreen (or double-click the screen)">⛶</button>
                     <button class="btn-icon btn-close" title="Close Monitor">✕</button>
                 </div>
                 <div class="screen-container">
@@ -648,6 +661,7 @@
                 selectDevice: card.querySelector(".device-select"),
                 btnStart: card.querySelector(".btn-start"),
                 btnClose: card.querySelector(".btn-close"),
+                btnFullscreen: card.querySelector(".btn-fullscreen"),
                 canvas: card.querySelector("canvas"),
                 btnSnap: card.querySelector(".btn-snap"),
                 selectTheme: card.querySelector(".theme-select"),
@@ -662,6 +676,8 @@
             this.dom.selectDevice.addEventListener("change", () => this.handleDeviceChange());
             this.dom.btnStart.addEventListener("click", () => this.toggleStream());
             this.dom.btnClose.addEventListener("click", () => this.manager.removeCard(this.id));
+            this.dom.btnFullscreen.addEventListener("click", () => this.toggleFullscreen());
+            this.dom.canvas.addEventListener("dblclick", () => this.toggleFullscreen());
             this.dom.btnSnap.addEventListener("click", () => this.captureFrame());
             
             this.dom.btnCopy.addEventListener("click", () => this.copyToClipboard());
@@ -769,6 +785,14 @@
 
             this.lastLatency = performance.now() - t0;
             return parseResponse(reply);
+        }
+
+        toggleFullscreen() {
+            if (document.fullscreenElement === this.dom.canvas) {
+                document.exitFullscreen();
+            } else {
+                this.dom.canvas.requestFullscreen().catch(console.error);
+            }
         }
 
         async captureFrame() {
